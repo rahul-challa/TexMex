@@ -1,6 +1,7 @@
 {
   "name": "texmex",
   "displayName": "TexMex",
+  "publisher": "RahulChalla",
   "description": "Live LaTeX preview and editing for VS Code",
   "version": "0.0.1",
   "engines": {
@@ -63,7 +64,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/texmex.git"
+    "url": "https://github.com/RahulChalla/texmex.git"
   },
+  "author": "Rahul Challa <rahulchalla@email.com>",
   "license": "MIT"
 }
