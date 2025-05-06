@@ -1,0 +1,69 @@
+{
+  "name": "texmex",
+  "displayName": "TexMex",
+  "description": "Live LaTeX preview and editing for VS Code",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:latex",
+    "onCommand:texmex.openPreview"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "texmex.openPreview",
+        "title": "TexMex: Open Live Preview"
+      }
+    ],
+    "configuration": {
+      "title": "TexMex",
+      "properties": {
+        "texmex.latexPath": {
+          "type": "string",
+          "default": "pdflatex",
+          "description": "Path to the LaTeX compiler executable"
+        },
+        "texmex.updateDelay": {
+          "type": "number",
+          "default": 1000,
+          "description": "Delay in milliseconds before updating the preview after changes"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "eslint": "^8.54.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
+    "typescript": "^5.3.2",
+    "@vscode/test-electron": "^2.3.8"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.0.379"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/texmex.git"
+  },
+  "license": "MIT"
+}
