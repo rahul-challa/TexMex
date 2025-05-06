@@ -12,7 +12,8 @@
   ],
   "activationEvents": [
     "onLanguage:latex",
-    "onCommand:texmex.openPreview"
+    "onCommand:texmex.openPreview",
+    "onCommand:texmex.saveAsPDF"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -20,6 +21,10 @@
       {
         "command": "texmex.openPreview",
         "title": "TexMex: Open Live Preview"
+      },
+      {
+        "command": "texmex.saveAsPDF",
+        "title": "TexMex: Save as PDF"
       }
     ],
     "configuration": {
