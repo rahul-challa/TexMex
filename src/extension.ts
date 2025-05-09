@@ -108,18 +108,47 @@ function getPreviewHtml(pdfBase64: string): string {
             }
             #pdf-container {
                 width: 100%;
-                height: calc(100vh - 40px);
+                height: calc(100vh - 80px);
                 overflow: auto;
+            }
+            #download-button {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                padding: 8px 16px;
+                background-color: var(--vscode-button-background);
+                color: var(--vscode-button-foreground);
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            #download-button:hover {
+                background-color: var(--vscode-button-hoverBackground);
             }
         </style>
     </head>
     <body>
+        <button id="download-button">Download PDF</button>
         <div id="pdf-container"></div>
         <script>
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             
             const pdfData = atob('${pdfBase64}');
             const loadingTask = pdfjsLib.getDocument({data: pdfData});
+            
+            // Add download functionality
+            document.getElementById('download-button').addEventListener('click', function() {
+                const blob = new Blob([pdfData], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'document.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
             
             loadingTask.promise.then(function(pdf) {
                 const container = document.getElementById('pdf-container');
