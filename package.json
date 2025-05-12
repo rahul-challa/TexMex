@@ -7,24 +7,29 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "assets/logo.png",
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "latex",
+    "preview",
+    "pdf",
+    "tex",
+    "documentation"
   ],
   "activationEvents": [
     "onLanguage:latex",
     "onCommand:texmex.openPreview",
-    "onCommand:texmex.saveAsPDF"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "texmex.openPreview",
-        "title": "TexMex: Open Live Preview"
-      },
-      {
-        "command": "texmex.saveAsPDF",
-        "title": "TexMex: Save as PDF"
+        "title": "TexMex: Open Live Preview",
+        "category": "TexMex"
       }
     ],
     "configuration": {
@@ -49,7 +54,8 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "clean": "rimraf out .texmex-temp"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
@@ -61,6 +67,7 @@
     "eslint": "^8.54.0",
     "glob": "^10.3.10",
     "mocha": "^10.2.0",
+    "rimraf": "^5.0.5",
     "typescript": "^5.3.2",
     "@vscode/test-electron": "^2.3.8"
   },
@@ -71,6 +78,10 @@
     "type": "git",
     "url": "https://github.com/RahulChalla/texmex.git"
   },
+  "bugs": {
+    "url": "https://github.com/RahulChalla/texmex/issues"
+  },
+  "homepage": "https://github.com/RahulChalla/texmex#readme",
   "author": "Rahul Challa <challaviswanadhrahul@gmail.com>",
   "license": "MIT"
 }

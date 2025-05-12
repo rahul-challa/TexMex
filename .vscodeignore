@@ -1,5 +1,4 @@
-.vscode/**
-.vscode-test/**
+# Source code
 src/**
 .gitignore
 .yarnrc
@@ -7,4 +6,18 @@ vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
-**/*.ts 
+**/*.ts
+
+# Development files
+.vscode/**
+.vscode-test/**
+test/**
+.github/**
+
+# Build artifacts
+out/test/**
+out/**/*.map
+
+# Documentation
+CHANGELOG.md
+CONTRIBUTING.md 
