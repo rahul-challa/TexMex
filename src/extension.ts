@@ -1,24 +1,43 @@
 /**
  * TexMex - LaTeX Live Preview Extension for VS Code
- * 
+ *
  * This extension provides live preview functionality for LaTeX documents,
  * similar to Overleaf, but integrated directly into VS Code.
+ *
+ * Features:
+ * - Live LaTeX preview with automatic updates
+ * - Peer collaboration via WebSocket
+ * - PDF download functionality
+ * - No external runtime dependencies
  */
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as cp from 'child_process';
+import { PeerCollaborationServer, PeerClient } from './peerServer';
+import { getEmbeddedPdfViewerHtml, getErrorHtml } from './pdfViewer';
 
 // Global state
 let previewPanel: vscode.WebviewPanel | undefined;
 let updateTimeout: NodeJS.Timeout | undefined;
+let peerServer: PeerCollaborationServer | undefined;
+let peerClient: PeerClient | undefined;
+let serverPort: number = 0;
 
 /**
  * Activates the extension and registers all commands and event handlers.
  * @param context The extension context
  */
 export function activate(context: vscode.ExtensionContext) {
+    // Initialize peer server if collaboration is enabled
+    const config = vscode.workspace.getConfiguration('texmex');
+    const enablePeerWork = config.get<boolean>('enablePeerWork', true);
+
+    if (enablePeerWork) {
+        initializePeerServer(context);
+    }
+
     // Show welcome page on install or update
     const currentVersion = vscode.extensions.getExtension('RahulChalla.texmex')?.packageJSON.version;
     const previousVersion = context.globalState.get<string>('texmexVersion');
@@ -28,8 +47,8 @@ export function activate(context: vscode.ExtensionContext) {
         context.globalState.update('texmexVersion', currentVersion);
     }
 
-    // Register the command to open preview
-    const disposable = vscode.commands.registerCommand('texmex.openPreview', () => {
+    // Register commands
+    const openPreviewCmd = vscode.commands.registerCommand('texmex.openPreview', () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showErrorMessage('No active editor found');
@@ -45,6 +64,40 @@ export function activate(context: vscode.ExtensionContext) {
         updatePreview(editor.document);
     });
 
+    const joinPeerCmd = vscode.commands.registerCommand('texmex.joinPeerSession', async () => {
+        if (!enablePeerWork) {
+            vscode.window.showErrorMessage('Peer work is not enabled. Enable it in settings.');
+            return;
+        }
+
+        const sessionId = await vscode.window.showInputBox({
+            prompt: 'Enter peer session ID',
+            placeHolder: 'Session ID from your peer'
+        });
+
+        if (sessionId) {
+            connectToPeerSession(sessionId);
+        }
+    });
+
+    const createPeerSessionCmd = vscode.commands.registerCommand('texmex.createPeerSession', () => {
+        if (!peerServer) {
+            vscode.window.showErrorMessage('Peer server not initialized');
+            return;
+        }
+
+        const sessionId = generateSessionId();
+        vscode.window.showInformationMessage(
+            `Peer Session Created: ${sessionId}`,
+            'Copy'
+        ).then(action => {
+            if (action === 'Copy') {
+                vscode.env.clipboard.writeText(sessionId);
+                vscode.window.showInformationMessage('Session ID copied to clipboard!');
+            }
+        });
+    });
+
     // Watch for document changes
     const changeDisposable = vscode.workspace.onDidChangeTextDocument(event => {
         if (previewPanel && event.document === vscode.window.activeTextEditor?.document) {
@@ -53,11 +106,62 @@ export function activate(context: vscode.ExtensionContext) {
             }
             updateTimeout = setTimeout(() => {
                 updatePreview(event.document);
-            }, vscode.workspace.getConfiguration('texmex').get('updateDelay', 1000));
+            }, config.get('updateDelay', 1000));
+        }
+
+        // Broadcast changes to peers
+        if (peerClient && event.document === vscode.window.activeTextEditor?.document) {
+            peerClient.send({
+                type: 'change',
+                content: event.document.getText()
+            });
         }
     });
 
-    context.subscriptions.push(disposable, changeDisposable);
+    context.subscriptions.push(openPreviewCmd, joinPeerCmd, createPeerSessionCmd, changeDisposable);
+}
+
+async function initializePeerServer(context: vscode.ExtensionContext) {
+    try {
+        peerServer = new PeerCollaborationServer();
+        serverPort = await peerServer.start();
+        console.log(`TexMex peer server started on port ${serverPort}`);
+    } catch (error) {
+        console.error('Failed to start peer server:', error);
+    }
+}
+
+async function connectToPeerSession(sessionId: string) {
+    try {
+        if (!peerClient) {
+            peerClient = new PeerClient();
+        }
+
+        const wsUrl = `ws://127.0.0.1:${serverPort}`;
+        await peerClient.connect(wsUrl, sessionId, () => {
+            vscode.window.showInformationMessage('Connected to peer session!');
+        });
+
+        // Handle peer messages
+        peerClient.on('change', (message) => {
+            if (message.content && previewPanel) {
+                // Update preview with peer's changes
+                const tempDir = path.join(vscode.workspace.rootPath || '', '.texmex-temp');
+                const tempFile = path.join(tempDir, 'peer-sync.tex');
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+                fs.writeFileSync(tempFile, message.content);
+                updatePreviewWithFile(tempFile);
+            }
+        });
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to connect to peer session: ${error}`);
+    }
+}
+
+function generateSessionId(): string {
+    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
@@ -71,8 +175,13 @@ function createPreviewPanel(context: vscode.ExtensionContext) {
         vscode.ViewColumn.Two,
         {
             enableScripts: true,
-            retainContextWhenHidden: true
+            retainContextWhenHidden: true,
+            enableCommandUris: true
         }
+    );
+
+    previewPanel.iconPath = vscode.Uri.file(
+        path.join(context.extensionPath, 'assets', 'logo.png')
     );
 
     previewPanel.onDidDispose(() => {
@@ -142,9 +251,32 @@ async function updatePreview(document: vscode.TextDocument) {
     try {
         await compileLatex(tempDir, tempFile);
         const base64Pdf = await convertPdfToBase64(outputFile);
-        previewPanel.webview.html = getPreviewHtml(base64Pdf);
+        const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+        previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
     } catch (error) {
-        previewPanel.webview.html = getErrorHtml(error as Error);
+        const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+        previewPanel.webview.html = getErrorHtml(error as Error, isDarkTheme);
+    }
+}
+
+/**
+ * Updates preview from a specific file (used for peer sync).
+ * @param filePath Path to the LaTeX file to compile
+ */
+async function updatePreviewWithFile(filePath: string) {
+    if (!previewPanel) return;
+
+    const tempDir = path.dirname(filePath);
+    const outputFile = path.join(tempDir, 'peer-sync.pdf');
+
+    try {
+        await compileLatex(tempDir, filePath);
+        const base64Pdf = await convertPdfToBase64(outputFile);
+        const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+        previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+    } catch (error) {
+        const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+        previewPanel.webview.html = getErrorHtml(error as Error, isDarkTheme);
     }
 }
 
@@ -176,123 +308,20 @@ async function convertPdfToBase64(pdfPath: string): Promise<string> {
     return pdfBuffer.toString('base64');
 }
 
-/**
- * Generates the HTML content for the preview panel.
- * @param pdfBase64 Base64 encoded PDF data
- * @returns HTML string for the preview panel
- */
-function getPreviewHtml(pdfBase64: string): string {
-    return `<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-        <style>
-            body {
-                margin: 0;
-                padding: 20px;
-                background-color: var(--vscode-editor-background);
-                color: var(--vscode-editor-foreground);
-            }
-            #pdf-container {
-                width: 100%;
-                height: calc(100vh - 80px);
-                overflow: auto;
-            }
-            #download-button {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                padding: 8px 16px;
-                background-color: var(--vscode-button-background);
-                color: var(--vscode-button-foreground);
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-            }
-            #download-button:hover {
-                background-color: var(--vscode-button-hoverBackground);
-            }
-        </style>
-    </head>
-    <body>
-        <button id="download-button">Download PDF</button>
-        <div id="pdf-container"></div>
-        <script>
-            const vscode = acquireVsCodeApi();
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            
-            const pdfData = atob('${pdfBase64}');
-            const loadingTask = pdfjsLib.getDocument({data: pdfData});
-            
-            // Add download functionality
-            document.getElementById('download-button').addEventListener('click', function() {
-                vscode.postMessage({
-                    command: 'downloadPDF'
-                });
-            });
-            
-            loadingTask.promise.then(function(pdf) {
-                const container = document.getElementById('pdf-container');
-                
-                for(let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                    pdf.getPage(pageNum).then(function(page) {
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
-                        const viewport = page.getViewport({scale: 1.5});
-                        
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-                        
-                        const renderContext = {
-                            canvasContext: context,
-                            viewport: viewport
-                        };
-                        
-                        page.render(renderContext);
-                        container.appendChild(canvas);
-                    });
-                }
-            }).catch(function(error) {
-                console.error('Error loading PDF:', error);
-                container.innerHTML = '<p>Error loading PDF preview</p>';
-            });
-        </script>
-    </body>
-    </html>`;
-}
-
-/**
- * Generates HTML content for error display.
- * @param error The error to display
- * @returns HTML string for error display
- */
-function getErrorHtml(error: Error): string {
-    return `<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {
-                margin: 20px;
-                color: var(--vscode-errorForeground);
-            }
-        </style>
-    </head>
-    <body>
-        <h2>Error compiling LaTeX</h2>
-        <pre>${error.message}</pre>
-    </body>
-    </html>`;
-}
 
 /**
  * Deactivates the extension and cleans up resources.
  */
-export function deactivate() {
+export async function deactivate() {
     if (updateTimeout) {
         clearTimeout(updateTimeout);
+    }
+
+    if (peerClient) {
+        peerClient.disconnect();
+    }
+
+    if (peerServer) {
+        await peerServer.stop();
     }
 } 

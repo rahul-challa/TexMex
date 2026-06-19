@@ -30,6 +30,16 @@
         "command": "texmex.openPreview",
         "title": "TexMex: Open Live Preview",
         "category": "TexMex"
+      },
+      {
+        "command": "texmex.createPeerSession",
+        "title": "TexMex: Create Peer Session",
+        "category": "TexMex"
+      },
+      {
+        "command": "texmex.joinPeerSession",
+        "title": "TexMex: Join Peer Session",
+        "category": "TexMex"
       }
     ],
     "configuration": {
@@ -44,35 +54,49 @@
           "type": "number",
           "default": 1000,
           "description": "Delay in milliseconds before updating the preview after changes"
+        },
+        "texmex.enablePeerWork": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable peer collaboration features (WebSocket support)"
+        },
+        "texmex.peerServerPort": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the peer collaboration server"
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run clean && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
-    "clean": "rimraf out .texmex-temp"
+    "clean": "rimraf out .texmex-temp",
+    "package": "npm run vscode:prepublish && vsce package",
+    "install-vsce": "npm install -g @vscode/vsce"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.6",
     "@types/node": "20.x",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^6.13.1",
     "@typescript-eslint/parser": "^6.13.1",
+    "@vscode/test-electron": "^2.3.8",
+    "esbuild": "^0.19.0",
     "eslint": "^8.54.0",
     "glob": "^10.3.10",
     "mocha": "^10.2.0",
     "rimraf": "^5.0.5",
-    "typescript": "^5.3.2",
-    "@vscode/test-electron": "^2.3.8"
+    "typescript": "^5.3.2"
   },
   "dependencies": {
-    "pdfjs-dist": "^4.0.379"
+    "ws": "^8.14.2"
   },
   "repository": {
     "type": "git",
