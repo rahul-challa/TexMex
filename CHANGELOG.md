@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.0.7] - 2025-06-19
+### Added
+- 🎯 **Hybrid LaTeX Compilation Mode** - Local + Online with automatic fallback
+- Support for users without LaTeX distribution installed
+- Online compilation via pdflatex.online (free, no account required)
+- Automatic detection of local LaTeX installation
+- Fallback to online when local LaTeX not available
+- Configuration option to control online fallback behavior
+
+### Changed
+- Improved compiler detection and error handling
+- Better user notifications for compilation mode
+- Enhanced LaTeX detection at extension startup
+
+### Benefits
+- **Zero installation barriers** - Users without LaTeX can still use the extension
+- **Privacy-first** - Uses local compilation when available
+- **Graceful degradation** - Seamlessly falls back to online when needed
+- **Best of both worlds** - Fast local compilation for power users, easy online for everyone else
+
+### New Features
+- `texmex.enableOnlineFallback` setting (default: true)
+- Automatic LaTeX installation check on startup
+- Online compilation engine with pdflatex.online integration
+
 ## [0.0.6] - 2025-06-19
 ### Added
 - 🤝 **WebSocket-based peer collaboration** for real-time document synchronization
