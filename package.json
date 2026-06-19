@@ -64,6 +64,11 @@
           "type": "number",
           "default": 3000,
           "description": "Port for the peer collaboration server"
+        },
+        "texmex.enableOnlineFallback": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable online LaTeX compilation fallback if local LaTeX distro not found"
         }
       }
     }

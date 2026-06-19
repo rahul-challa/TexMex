@@ -17,6 +17,7 @@ import * as fs from 'fs';
 import * as cp from 'child_process';
 import { PeerCollaborationServer, PeerClient } from './peerServer';
 import { getEmbeddedPdfViewerHtml, getErrorHtml } from './pdfViewer';
+import { compileLatex, checkLatexInstallation, notifyCompilationMode } from './latexCompiler';
 
 // Global state
 let previewPanel: vscode.WebviewPanel | undefined;
@@ -33,10 +34,16 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize peer server if collaboration is enabled
     const config = vscode.workspace.getConfiguration('texmex');
     const enablePeerWork = config.get<boolean>('enablePeerWork', true);
+    const latexPath = config.get<string>('latexPath', 'pdflatex');
 
     if (enablePeerWork) {
         initializePeerServer(context);
     }
+
+    // Check LaTeX installation at startup
+    checkLatexInstallation(latexPath).catch(error => {
+        console.error('Error checking LaTeX installation:', error);
+    });
 
     // Show welcome page on install or update
     const currentVersion = vscode.extensions.getExtension('RahulChalla.texmex')?.packageJSON.version;
@@ -236,9 +243,11 @@ async function updatePreview(document: vscode.TextDocument) {
     if (!previewPanel) return;
 
     const content = document.getText();
+    const config = vscode.workspace.getConfiguration('texmex');
+    const latexPath = config.get<string>('latexPath', 'pdflatex');
+    const enableOnlineFallback = config.get<boolean>('enableOnlineFallback', true);
     const tempDir = path.join(vscode.workspace.rootPath || '', '.texmex-temp');
     const tempFile = path.join(tempDir, 'temp.tex');
-    const outputFile = path.join(tempDir, 'temp.pdf');
 
     // Ensure temp directory exists
     if (!fs.existsSync(tempDir)) {
@@ -249,10 +258,21 @@ async function updatePreview(document: vscode.TextDocument) {
     fs.writeFileSync(tempFile, content);
 
     try {
-        await compileLatex(tempDir, tempFile);
-        const base64Pdf = await convertPdfToBase64(outputFile);
-        const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
-        previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+        // Use hybrid compilation (local + online fallback)
+        const result = await compileLatex(latexPath, tempDir, tempFile, content, enableOnlineFallback);
+
+        if (result.success && result.pdfPath) {
+            const base64Pdf = await convertPdfToBase64(result.pdfPath);
+            const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+            previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+
+            // Notify user of compilation mode if using online
+            notifyCompilationMode(result);
+        } else {
+            const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+            const error = new Error(result.message);
+            previewPanel.webview.html = getErrorHtml(error, isDarkTheme);
+        }
     } catch (error) {
         const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
         previewPanel.webview.html = getErrorHtml(error as Error, isDarkTheme);
@@ -267,36 +287,29 @@ async function updatePreviewWithFile(filePath: string) {
     if (!previewPanel) return;
 
     const tempDir = path.dirname(filePath);
-    const outputFile = path.join(tempDir, 'peer-sync.pdf');
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const config = vscode.workspace.getConfiguration('texmex');
+    const latexPath = config.get<string>('latexPath', 'pdflatex');
+    const enableOnlineFallback = config.get<boolean>('enableOnlineFallback', true);
 
     try {
-        await compileLatex(tempDir, filePath);
-        const base64Pdf = await convertPdfToBase64(outputFile);
-        const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
-        previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+        const result = await compileLatex(latexPath, tempDir, filePath, content, enableOnlineFallback);
+
+        if (result.success && result.pdfPath) {
+            const base64Pdf = await convertPdfToBase64(result.pdfPath);
+            const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+            previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+        } else {
+            const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+            const error = new Error(result.message);
+            previewPanel.webview.html = getErrorHtml(error, isDarkTheme);
+        }
     } catch (error) {
         const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
         previewPanel.webview.html = getErrorHtml(error as Error, isDarkTheme);
     }
 }
 
-/**
- * Compiles the LaTeX document using the configured compiler.
- * @param tempDir Directory for temporary files
- * @param tempFile Path to the temporary .tex file
- */
-async function compileLatex(tempDir: string, tempFile: string): Promise<void> {
-    const latexPath = vscode.workspace.getConfiguration('texmex').get('latexPath', 'pdflatex');
-    return new Promise<void>((resolve, reject) => {
-        cp.exec(`${latexPath} -interaction=nonstopmode -output-directory="${tempDir}" "${tempFile}"`, (error) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
 
 /**
  * Converts a PDF file to base64 string.
