@@ -4,27 +4,19 @@
 
 ---
 
-TexMex is a Visual Studio Code extension that provides live LaTeX preview functionality with **peer collaboration support**. Similar to Overleaf, but integrated directly into your editor with real-time synchronization across multiple users.
-
-**No LaTeX installation required.** TexMex bundles the [Tectonic](https://tectonic-typesetting.github.io/) LaTeX engine and downloads it automatically the first time you compile — no TeX Live, no MiKTeX, no setup. Just install the extension and open a `.tex` file.
+Live LaTeX preview for VS Code, with real-time peer collaboration. No LaTeX installation required — TexMex downloads and manages its own compiler.
 
 ## Features
 
-- **Plug and Play**: No LaTeX distribution to install — the compiler is downloaded and cached automatically on first use
-- **Live Preview**: See your LaTeX document rendered in real-time as you type
-- **Peer Collaboration**: Work with others using WebSocket-based real-time synchronization
-- **PDF Download**: Save your compiled documents as PDF files
-- **Automatic Updates**: Preview updates automatically when you save or edit
-- **Clear Error Reporting**: Compilation errors and logs are available in the "TexMex" output channel
-- **Customizable**: Configure update delay, peer settings, and optionally use your own LaTeX install
-- **Private by Default**: Compilation happens entirely on your machine — your document content is never sent anywhere
-- **Theme Support**: Respects VS Code dark and light themes
+- **No setup**: no TeX Live or MiKTeX to install — the compiler downloads itself on first use
+- **Live preview**: renders as you type, with a one-click preview button on any `.tex` file
+- **Peer collaboration**: real-time multi-user editing over WebSockets
+- **PDF export**: one click to save the compiled document
+- **Private**: compiles entirely on your machine, nothing is sent anywhere
 
 ## Requirements
 
-- Visual Studio Code version 1.85.0 or higher
-- Internet connection for the one-time LaTeX engine download (~10-22MB depending on platform) and whenever a document needs a package that hasn't been cached yet
-- **No Node.js, no LaTeX distribution required** — everything else is bundled or downloaded automatically
+- VS Code 1.85.0+, and an internet connection the first time you compile (~10-22MB one-time download). No Node.js or LaTeX distribution needed.
 
 ## Installation
 

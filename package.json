@@ -2,7 +2,7 @@
   "name": "texmex",
   "displayName": "TexMex",
   "publisher": "RahulChalla",
-  "description": "Live LaTeX preview and editing for VS Code",
+  "description": "Live LaTeX preview for VS Code. No LaTeX install required.",
   "version": "0.0.8",
   "engines": {
     "vscode": "^1.85.0"

@@ -253,6 +253,8 @@ function createPreviewPanel(context: vscode.ExtensionContext) {
         async message => {
             if (message.command === 'downloadPDF') {
                 await handlePdfDownload();
+            } else if (message.command === 'openSettings') {
+                await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:RahulChalla.texmex');
             }
         },
         undefined,

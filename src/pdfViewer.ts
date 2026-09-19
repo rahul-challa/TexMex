@@ -23,6 +23,8 @@ export function getEmbeddedPdfViewerHtml(
     const backgroundColor = isDarkTheme ? '#1e1e1e' : '#ffffff';
     const textColor = isDarkTheme ? '#d4d4d4' : '#000000';
     const controlBackground = isDarkTheme ? '#2d2d30' : '#f3f3f3';
+    const groupBackground = isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
+    const hoverBackground = isDarkTheme ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
     const { pdfJsUri, pdfWorkerUri, cspSource } = resources;
     const nonce = crypto.randomBytes(16).toString('base64');
 
@@ -52,42 +54,95 @@ export function getEmbeddedPdfViewerHtml(
         .toolbar {
             background-color: ${controlBackground};
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 8px 16px;
+            padding: 5px 10px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             flex-shrink: 0;
-            height: 44px;
+            height: 38px;
         }
 
-        button {
-            padding: 6px 12px;
-            background-color: var(--vscode-button-background, #0e639c);
-            color: var(--vscode-button-foreground, #ffffff);
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 1px;
+            background-color: ${groupBackground};
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .toolbar-spacer {
+            flex: 1;
+        }
+
+        .icon-btn {
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: ${textColor};
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 13px;
-            transition: background-color 0.2s;
+            font-size: 15px;
+            line-height: 1;
+            padding: 0;
+            transition: background-color 0.15s;
         }
 
-        button:hover {
-            background-color: var(--vscode-button-hoverBackground, #1177bb);
+        .icon-btn:hover:not(:disabled) {
+            background-color: ${hoverBackground};
         }
 
-        button:active {
-            opacity: 0.8;
+        .icon-btn:active:not(:disabled) {
+            opacity: 0.7;
         }
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .icon-btn:disabled {
+            opacity: 0.35;
+            cursor: default;
         }
 
-        .page-info {
-            margin-left: auto;
+        .page-input {
+            width: 32px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            color: ${textColor};
+            font-size: 12px;
+            padding: 2px 0;
+            font-family: inherit;
+        }
+
+        .page-input::-webkit-inner-spin-button,
+        .page-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .page-total {
             font-size: 12px;
             opacity: 0.7;
+            padding-right: 6px;
+            white-space: nowrap;
+        }
+
+        .zoom-level {
+            min-width: 44px;
+            font-size: 12px;
+            background: transparent;
+            border: none;
+            color: ${textColor};
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 4px 2px;
+            font-family: inherit;
+        }
+
+        .zoom-level:hover {
+            background-color: ${hoverBackground};
         }
 
         #pdf-container {
@@ -150,13 +205,20 @@ export function getEmbeddedPdfViewerHtml(
 </head>
 <body>
     <div class="toolbar">
-        <button id="prev-page" title="Previous page">&larr; Prev</button>
-        <button id="next-page" title="Next page">Next &rarr;</button>
-        <input type="number" id="page-number" min="1" style="width: 50px; padding: 4px; border: 1px solid rgba(0,0,0,0.2); border-radius: 3px; background: ${controlBackground}; color: ${textColor};">
-        <span class="page-info"><span id="current-page">0</span> / <span id="total-pages">0</span></span>
-        <button id="download-button" title="Download PDF">Download</button>
-        <button id="zoom-in" title="Zoom in">Zoom +</button>
-        <button id="zoom-out" title="Zoom out">Zoom -</button>
+        <div class="toolbar-group">
+            <button id="prev-page" class="icon-btn" title="Previous page">&lsaquo;</button>
+            <input type="number" id="page-number" min="1" class="page-input">
+            <span class="page-total">/ <span id="total-pages">0</span></span>
+            <button id="next-page" class="icon-btn" title="Next page">&rsaquo;</button>
+        </div>
+        <div class="toolbar-group">
+            <button id="zoom-out" class="icon-btn" title="Zoom out">&minus;</button>
+            <button id="zoom-level" class="zoom-level" title="Reset zoom to 100%">150%</button>
+            <button id="zoom-in" class="icon-btn" title="Zoom in">+</button>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button id="download-button" class="icon-btn" title="Download PDF">&#8681;</button>
+        <button id="settings-button" class="icon-btn" title="TexMex Settings">&#9881;</button>
     </div>
     <div id="pdf-container">
         <div class="loading" id="loading-indicator">
@@ -172,6 +234,10 @@ export function getEmbeddedPdfViewerHtml(
 
         const vscode = acquireVsCodeApi();
         const container = document.getElementById('pdf-container');
+        const prevButton = document.getElementById('prev-page');
+        const nextButton = document.getElementById('next-page');
+        const pageInput = document.getElementById('page-number');
+        const zoomLevelButton = document.getElementById('zoom-level');
 
         const pdfBase64 = '${pdfBase64}';
         const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
@@ -186,10 +252,12 @@ export function getEmbeddedPdfViewerHtml(
                 String(message).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></div>';
         }
 
-        function updatePageDisplay() {
-            document.getElementById('current-page').textContent = currentPage;
+        function updateToolbar() {
             document.getElementById('total-pages').textContent = pdfDoc ? pdfDoc.numPages : '?';
-            document.getElementById('page-number').value = currentPage;
+            pageInput.value = currentPage;
+            zoomLevelButton.textContent = Math.round(zoomLevel * 100) + '%';
+            prevButton.disabled = currentPage <= 1;
+            nextButton.disabled = !!(pdfDoc && currentPage >= pdfDoc.numPages);
         }
 
         async function renderPage(pageNumber) {
@@ -223,7 +291,7 @@ export function getEmbeddedPdfViewerHtml(
                 throw error;
             }
 
-            updatePageDisplay();
+            updateToolbar();
         }
 
         async function loadPdf() {
@@ -237,41 +305,35 @@ export function getEmbeddedPdfViewerHtml(
             }
         }
 
+        function goToPage(page) {
+            if (!pdfDoc || page < 1 || page > pdfDoc.numPages) return;
+            currentPage = page;
+            renderPage(currentPage);
+        }
+
+        function setZoom(newZoom) {
+            zoomLevel = Math.max(0.3, Math.min(5, Math.round(newZoom * 100) / 100));
+            renderPage(currentPage);
+        }
+
         document.getElementById('download-button').addEventListener('click', () => {
             vscode.postMessage({ command: 'downloadPDF' });
         });
 
-        document.getElementById('prev-page').addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                renderPage(currentPage);
-            }
+        document.getElementById('settings-button').addEventListener('click', () => {
+            vscode.postMessage({ command: 'openSettings' });
         });
 
-        document.getElementById('next-page').addEventListener('click', () => {
-            if (pdfDoc && currentPage < pdfDoc.numPages) {
-                currentPage++;
-                renderPage(currentPage);
-            }
+        prevButton.addEventListener('click', () => goToPage(currentPage - 1));
+        nextButton.addEventListener('click', () => goToPage(currentPage + 1));
+
+        pageInput.addEventListener('change', (e) => {
+            goToPage(parseInt(e.target.value, 10));
         });
 
-        document.getElementById('page-number').addEventListener('change', (e) => {
-            const page = parseInt(e.target.value, 10);
-            if (pdfDoc && page >= 1 && page <= pdfDoc.numPages) {
-                currentPage = page;
-                renderPage(currentPage);
-            }
-        });
-
-        document.getElementById('zoom-in').addEventListener('click', () => {
-            zoomLevel = Math.min(zoomLevel * 1.2, 5);
-            renderPage(currentPage);
-        });
-
-        document.getElementById('zoom-out').addEventListener('click', () => {
-            zoomLevel = Math.max(zoomLevel / 1.2, 0.3);
-            renderPage(currentPage);
-        });
+        document.getElementById('zoom-in').addEventListener('click', () => setZoom(zoomLevel + 0.1));
+        document.getElementById('zoom-out').addEventListener('click', () => setZoom(zoomLevel - 0.1));
+        zoomLevelButton.addEventListener('click', () => setZoom(1.0));
 
         loadPdf();
     </script>
