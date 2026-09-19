@@ -93,7 +93,8 @@
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "clean": "rimraf out",
-    "package": "npm run vscode:prepublish && vsce package",
+    "package": "npm run vscode:prepublish && vsce package --no-dependencies",
+    "publish": "npm run vscode:prepublish && vsce publish --no-dependencies",
     "install-vsce": "npm install -g @vscode/vsce"
   },
   "devDependencies": {
