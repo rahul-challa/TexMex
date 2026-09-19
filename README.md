@@ -184,7 +184,7 @@ TexMex ships without a LaTeX distribution to keep the `.vsix` small, and instead
 
 1. Ensure `texmex.enablePeerWork` is `true` in settings
 2. Check that the peer server port (default 3000) is not blocked by firewall
-3. Verify both users are running the extension version 0.0.8 or higher
+3. Verify both users are running extension version 0.0.6 or higher
 4. Session IDs must match exactly
 
 ### LaTeX Compilation Errors
@@ -225,7 +225,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 See [CHANGELOG.md](CHANGELOG.md) for full release notes.
 
-### v0.0.8 (Current)
+### v0.0.9 (Current)
+- Fixed the preview panel rendering blank by replacing the old iframe-based viewer with a bundled pdf.js
+- Redesigned the preview toolbar (grouped icon buttons, browser-style zoom, page-jump box) and added a settings shortcut
+- Added a one-click preview button on the editor title bar for any `.tex` file
+
+### v0.0.8
 - Bundled Tectonic LaTeX engine — no local LaTeX distribution required, downloaded and cached automatically on first use
 - Removed the online compilation fallback (`pdflatex.online`) that sent document content to a third party
 - Added a "TexMex" output channel with full compiler logs, plus **Reinstall LaTeX Engine** and **Show Compiler Log** commands

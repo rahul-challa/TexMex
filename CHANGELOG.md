@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.9] - 2026-09-18
+### Fixed
+- Preview panel rendering blank - the old viewer relied on a `blob:` iframe and VS Code webviews don't expose a native PDF plugin to render it. Replaced with a bundled `pdf.js`, rendering pages to a canvas
+- Download button icon read as a downvote arrow rather than a download affordance; swapped for the standard arrow-into-tray glyph
+
+### Added
+- Editor-title preview button (shows automatically on any `.tex` file, keyed off the file extension - no dependency on another extension registering a "latex" language)
+- `texmex.openPreview` now falls back to any visible `.tex` editor instead of requiring literal focus, so it still works if the terminal or another panel has focus
+- Settings (gear) button in the preview toolbar, opening VS Code's Settings UI filtered to TexMex - no more hand-editing `settings.json` for basic options
+
+### Changed
+- Preview toolbar redesigned to match conventional PDF reader/browser UX: grouped icon buttons, a page-jump box between chevrons, and a browser-style zoom control (`- 100% +`, click the percentage to reset)
+- Shortened the marketplace description and README hero section to a scannable length
+
 ## [0.0.8] - 2026-09-18
 ### Added
 - **Bundled Tectonic LaTeX engine** - no local LaTeX distribution required
