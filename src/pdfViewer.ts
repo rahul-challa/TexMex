@@ -1,18 +1,36 @@
 /**
  * Embedded PDF Viewer
- * Renders PDFs without external dependencies
- * Uses a simplified viewer compatible with the extension
+ * Renders PDFs using a locally bundled pdf.js (no external CDN dependencies,
+ * no reliance on a native PDF plugin inside the webview sandbox).
  */
 
-export function getEmbeddedPdfViewerHtml(pdfBase64: string, isDarkTheme: boolean = false): string {
+import * as crypto from 'crypto';
+
+export interface PdfViewerResources {
+    /** webview.asWebviewUri() for out/vendor/pdfjs/pdf.min.mjs */
+    pdfJsUri: string;
+    /** webview.asWebviewUri() for out/vendor/pdfjs/pdf.worker.min.mjs */
+    pdfWorkerUri: string;
+    /** webview.cspSource, for the Content-Security-Policy meta tag */
+    cspSource: string;
+}
+
+export function getEmbeddedPdfViewerHtml(
+    pdfBase64: string,
+    isDarkTheme: boolean,
+    resources: PdfViewerResources
+): string {
     const backgroundColor = isDarkTheme ? '#1e1e1e' : '#ffffff';
     const textColor = isDarkTheme ? '#d4d4d4' : '#000000';
     const controlBackground = isDarkTheme ? '#2d2d30' : '#f3f3f3';
+    const { pdfJsUri, pdfWorkerUri, cspSource } = resources;
+    const nonce = crypto.randomBytes(16).toString('base64');
 
     return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' ${cspSource} 'wasm-unsafe-eval'; style-src ${cspSource} 'unsafe-inline'; img-src ${cspSource} data: blob:; worker-src ${cspSource} blob:; connect-src ${cspSource} blob:; font-src ${cspSource};">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * {
@@ -82,7 +100,7 @@ export function getEmbeddedPdfViewerHtml(pdfBase64: string, isDarkTheme: boolean
             gap: 20px;
         }
 
-        .pdf-page {
+        #pdf-canvas {
             background-color: white;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             border: 1px solid rgba(0, 0, 0, 0.1);
@@ -132,71 +150,93 @@ export function getEmbeddedPdfViewerHtml(pdfBase64: string, isDarkTheme: boolean
 </head>
 <body>
     <div class="toolbar">
-        <button id="prev-page" title="Previous page">← Prev</button>
-        <button id="next-page" title="Next page">Next →</button>
+        <button id="prev-page" title="Previous page">&larr; Prev</button>
+        <button id="next-page" title="Next page">Next &rarr;</button>
         <input type="number" id="page-number" min="1" style="width: 50px; padding: 4px; border: 1px solid rgba(0,0,0,0.2); border-radius: 3px; background: ${controlBackground}; color: ${textColor};">
         <span class="page-info"><span id="current-page">0</span> / <span id="total-pages">0</span></span>
-        <button id="download-button" title="Download PDF">⬇ Download</button>
-        <button id="zoom-in" title="Zoom in">🔍+</button>
-        <button id="zoom-out" title="Zoom out">🔍−</button>
+        <button id="download-button" title="Download PDF">Download</button>
+        <button id="zoom-in" title="Zoom in">Zoom +</button>
+        <button id="zoom-out" title="Zoom out">Zoom -</button>
     </div>
     <div id="pdf-container">
-        <div class="loading">
+        <div class="loading" id="loading-indicator">
             <div class="spinner"></div>
             <span>Loading PDF...</span>
         </div>
     </div>
 
-    <script>
-        const vscode = acquireVsCodeApi();
+    <script type="module" nonce="${nonce}">
+        import * as pdfjsLib from "${pdfJsUri}";
 
-        // Base64 PDF data
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "${pdfWorkerUri}";
+
+        const vscode = acquireVsCodeApi();
+        const container = document.getElementById('pdf-container');
+
         const pdfBase64 = '${pdfBase64}';
         const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
 
+        let pdfDoc = null;
         let currentPage = 1;
-        let totalPages = 0;
         let zoomLevel = 1.5;
-        const container = document.getElementById('pdf-container');
-
-        // Simple PDF parser for basic rendering
-        function parsePdfAndRender() {
-            try {
-                // Create a blob from the PDF data
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-
-                // Since we can't use pdf.js from CDN, we'll use an iframe approach
-                // This is a fallback that works without external dependencies
-                const iframe = document.createElement('iframe');
-                iframe.style.width = '100%';
-                iframe.style.height = '100%';
-                iframe.style.border = 'none';
-                iframe.src = url;
-
-                container.innerHTML = '';
-                container.appendChild(iframe);
-
-                // Note: For better rendering, pdf.js should be bundled
-                // This fallback uses the browser's native PDF viewer
-
-            } catch (error) {
-                showError('Error loading PDF: ' + error.message);
-            }
-        }
+        let renderTask = null;
 
         function showError(message) {
             container.innerHTML = '<div class="error"><h3>Error</h3><pre>' +
-                message.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></div>';
+                String(message).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></div>';
         }
 
         function updatePageDisplay() {
             document.getElementById('current-page').textContent = currentPage;
-            document.getElementById('total-pages').textContent = totalPages || '?';
+            document.getElementById('total-pages').textContent = pdfDoc ? pdfDoc.numPages : '?';
             document.getElementById('page-number').value = currentPage;
         }
 
-        // Event listeners
+        async function renderPage(pageNumber) {
+            if (!pdfDoc) return;
+
+            if (renderTask) {
+                renderTask.cancel();
+            }
+
+            const page = await pdfDoc.getPage(pageNumber);
+            const viewport = page.getViewport({ scale: zoomLevel });
+
+            let canvas = document.getElementById('pdf-canvas');
+            if (!canvas) {
+                canvas = document.createElement('canvas');
+                canvas.id = 'pdf-canvas';
+                container.innerHTML = '';
+                container.appendChild(canvas);
+            }
+
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            const canvasContext = canvas.getContext('2d');
+            renderTask = page.render({ canvasContext, viewport });
+
+            try {
+                await renderTask.promise;
+            } catch (error) {
+                if (error && error.name === 'RenderingCancelledException') return;
+                throw error;
+            }
+
+            updatePageDisplay();
+        }
+
+        async function loadPdf() {
+            try {
+                const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+                pdfDoc = await loadingTask.promise;
+                currentPage = 1;
+                await renderPage(currentPage);
+            } catch (error) {
+                showError('Failed to render PDF: ' + (error && error.message ? error.message : error));
+            }
+        }
+
         document.getElementById('download-button').addEventListener('click', () => {
             vscode.postMessage({ command: 'downloadPDF' });
         });
@@ -204,54 +244,36 @@ export function getEmbeddedPdfViewerHtml(pdfBase64: string, isDarkTheme: boolean
         document.getElementById('prev-page').addEventListener('click', () => {
             if (currentPage > 1) {
                 currentPage--;
-                updatePageDisplay();
+                renderPage(currentPage);
             }
         });
 
         document.getElementById('next-page').addEventListener('click', () => {
-            if (totalPages === 0 || currentPage < totalPages) {
+            if (pdfDoc && currentPage < pdfDoc.numPages) {
                 currentPage++;
-                updatePageDisplay();
+                renderPage(currentPage);
             }
         });
 
         document.getElementById('page-number').addEventListener('change', (e) => {
             const page = parseInt(e.target.value, 10);
-            if (page >= 1 && (totalPages === 0 || page <= totalPages)) {
+            if (pdfDoc && page >= 1 && page <= pdfDoc.numPages) {
                 currentPage = page;
-                updatePageDisplay();
+                renderPage(currentPage);
             }
         });
 
         document.getElementById('zoom-in').addEventListener('click', () => {
-            zoomLevel *= 1.2;
-            // Update iframe zoom if supported
-            const iframe = container.querySelector('iframe');
-            if (iframe) {
-                iframe.style.transform = 'scale(' + zoomLevel + ')';
-                iframe.style.transformOrigin = 'top center';
-            }
+            zoomLevel = Math.min(zoomLevel * 1.2, 5);
+            renderPage(currentPage);
         });
 
         document.getElementById('zoom-out').addEventListener('click', () => {
-            zoomLevel /= 1.2;
-            // Update iframe zoom if supported
-            const iframe = container.querySelector('iframe');
-            if (iframe) {
-                iframe.style.transform = 'scale(' + zoomLevel + ')';
-                iframe.style.transformOrigin = 'top center';
-            }
+            zoomLevel = Math.max(zoomLevel / 1.2, 0.3);
+            renderPage(currentPage);
         });
 
-        // Load PDF
-        try {
-            parsePdfAndRender();
-            // Try to get page count (this is tricky without pdf.js)
-            totalPages = 0; // Unknown without proper parsing
-            updatePageDisplay();
-        } catch (error) {
-            showError('Failed to initialize PDF viewer: ' + error.message);
-        }
+        loadPdf();
     </script>
 </body>
 </html>`;
@@ -265,6 +287,7 @@ export function getErrorHtml(error: Error, isDarkTheme: boolean = false): string
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {

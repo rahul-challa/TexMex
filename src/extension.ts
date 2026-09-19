@@ -17,7 +17,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { PeerCollaborationServer, PeerClient } from './peerServer';
-import { getEmbeddedPdfViewerHtml, getErrorHtml } from './pdfViewer';
+import { getEmbeddedPdfViewerHtml, getErrorHtml, PdfViewerResources } from './pdfViewer';
 import { compileLatex, outputChannel } from './latexCompiler';
 import { reinstallEngine } from './engineManager';
 
@@ -41,6 +41,24 @@ function getTempDir(): string {
         fs.mkdirSync(dir, { recursive: true });
     }
     return dir;
+}
+
+/**
+ * Finds the editor to preview: the active editor if it's a .tex file,
+ * otherwise the first visible .tex editor. Falling back like this means
+ * the command still works if focus is elsewhere (e.g. the terminal) when
+ * a .tex file is already open.
+ */
+function findTexEditor(): vscode.TextEditor | undefined {
+    const isTexDocument = (document: vscode.TextDocument) =>
+        document.languageId === 'latex' || document.fileName.toLowerCase().endsWith('.tex');
+
+    const active = vscode.window.activeTextEditor;
+    if (active && isTexDocument(active.document)) {
+        return active;
+    }
+
+    return vscode.window.visibleTextEditors.find(editor => isTexDocument(editor.document));
 }
 
 /**
@@ -69,9 +87,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     const openPreviewCmd = vscode.commands.registerCommand('texmex.openPreview', () => {
-        const editor = vscode.window.activeTextEditor;
+        const editor = findTexEditor();
         if (!editor) {
-            vscode.window.showErrorMessage('No active editor found');
+            vscode.window.showErrorMessage('Open a .tex file first, then run TexMex: Open Live Preview.');
             return;
         }
 
@@ -217,7 +235,8 @@ function createPreviewPanel(context: vscode.ExtensionContext) {
         {
             enableScripts: true,
             retainContextWhenHidden: true,
-            enableCommandUris: true
+            enableCommandUris: true,
+            localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'out')]
         }
     );
 
@@ -239,6 +258,18 @@ function createPreviewPanel(context: vscode.ExtensionContext) {
         undefined,
         context.subscriptions
     );
+}
+
+/**
+ * Builds the webview-safe resource URIs pdf.js needs, and its CSP source.
+ */
+function getPdfViewerResources(context: vscode.ExtensionContext, webview: vscode.Webview): PdfViewerResources {
+    const vendorDir = vscode.Uri.joinPath(context.extensionUri, 'out', 'vendor', 'pdfjs');
+    return {
+        pdfJsUri: webview.asWebviewUri(vscode.Uri.joinPath(vendorDir, 'pdf.min.mjs')).toString(),
+        pdfWorkerUri: webview.asWebviewUri(vscode.Uri.joinPath(vendorDir, 'pdf.worker.min.mjs')).toString(),
+        cspSource: webview.cspSource
+    };
 }
 
 /**
@@ -289,7 +320,8 @@ async function updatePreview(document: vscode.TextDocument) {
         if (result.success && result.pdfPath) {
             const base64Pdf = await convertPdfToBase64(result.pdfPath);
             const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
-            previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+            const resources = getPdfViewerResources(extensionContext, previewPanel.webview);
+            previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme, resources);
         } else {
             const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
             const error = new Error(result.message);
@@ -316,7 +348,8 @@ async function updatePreviewWithFile(filePath: string) {
         if (result.success && result.pdfPath) {
             const base64Pdf = await convertPdfToBase64(result.pdfPath);
             const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
-            previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme);
+            const resources = getPdfViewerResources(extensionContext, previewPanel.webview);
+            previewPanel.webview.html = getEmbeddedPdfViewerHtml(base64Pdf, isDarkTheme, resources);
         } else {
             const isDarkTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
             const error = new Error(result.message);

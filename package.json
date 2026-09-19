@@ -28,7 +28,8 @@
       {
         "command": "texmex.openPreview",
         "title": "TexMex: Open Live Preview",
-        "category": "TexMex"
+        "category": "TexMex",
+        "icon": "$(open-preview)"
       },
       {
         "command": "texmex.createPeerSession",
@@ -80,15 +81,25 @@
           "description": "Path to your system LaTeX compiler executable. Only used when texmex.useSystemLatex is enabled"
         }
       }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "texmex.openPreview",
+          "when": "resourceExtname == .tex",
+          "group": "navigation"
+        }
+      ]
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run clean && npm run build",
     "compile": "npm run typecheck && npm run esbuild",
     "typecheck": "tsc --noEmit -p ./",
-    "esbuild": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap",
-    "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
-    "watch": "npm run esbuild -- --watch",
+    "esbuild": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap && npm run copy-pdfjs",
+    "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify && npm run copy-pdfjs",
+    "copy-pdfjs": "node scripts/copy-pdfjs.js",
+    "watch": "npm run copy-pdfjs && esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
@@ -110,6 +121,7 @@
     "eslint": "^8.54.0",
     "glob": "^10.3.10",
     "mocha": "^10.2.0",
+    "pdfjs-dist": "^6.3.289",
     "rimraf": "^5.0.5",
     "typescript": "^5.3.2"
   },

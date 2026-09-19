@@ -27,4 +27,5 @@ PUBLISHING.md
 archive/**
 build.bat
 build.sh
-sample.tex 
+sample.tex
+scripts/** 
