@@ -8,13 +8,11 @@ node_modules/
 # VS Code
 .vscode-test/
 *.vsix
+*.visx
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Extension specific
-.texmex-temp/
 
 # Logs
 *.log

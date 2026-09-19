@@ -5,8 +5,8 @@
 
 set -e
 
-echo "🔨 TexMex Build Script"
-echo "====================="
+echo "TexMex Build Script"
+echo "===================="
 
 # Colors
 GREEN='\033[0;32m'
@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Check if npm is installed
 if ! command -v npm &> /dev/null; then
-    echo "❌ npm is not installed. Please install Node.js and npm first."
+    echo "npm is not installed. Please install Node.js and npm first."
     exit 1
 fi
 
@@ -42,20 +42,20 @@ npm run package
 VSIX_FILE=$(find . -maxdepth 1 -name "texmex-*.vsix" | head -n 1)
 
 if [ -z "$VSIX_FILE" ]; then
-    echo "❌ Failed to find .vsix file"
+    echo "Failed to find .vsix file"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Build successful!${NC}"
-echo -e "${GREEN}✓ Extension packaged: $(basename $VSIX_FILE)${NC}"
+echo -e "${GREEN}Build successful!${NC}"
+echo -e "${GREEN}Extension packaged: $(basename $VSIX_FILE)${NC}"
 echo ""
-echo "📦 Installation Instructions:"
+echo "Installation Instructions:"
 echo "1. Open VS Code"
 echo "2. Press Ctrl+Shift+X (or Cmd+Shift+X on Mac)"
-echo "3. Click the ... menu → Install from VSIX..."
+echo "3. Click the ... menu -> Install from VSIX..."
 echo "4. Select: $VSIX_FILE"
 echo ""
-echo "🚀 To get started:"
+echo "To get started:"
 echo "1. Open a .tex file"
 echo "2. Press Ctrl+Shift+P"
 echo "3. Type 'TexMex: Open Live Preview'"

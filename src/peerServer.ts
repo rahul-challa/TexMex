@@ -3,7 +3,7 @@
  * Enables multiple VS Code instances to collaborate on LaTeX documents
  */
 
-import * as WebSocket from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import * as net from 'net';
 import * as vscode from 'vscode';
 
@@ -17,8 +17,8 @@ interface PeerMessage {
 }
 
 export class PeerCollaborationServer {
-    private wss: WebSocket.Server | null = null;
-    private peers: Map<string, WebSocket.WebSocket> = new Map();
+    private wss: WebSocketServer | null = null;
+    private peers: Map<string, WebSocket> = new Map();
     private port: number = 0;
     private sessions: Map<string, Set<string>> = new Map();
     private server: net.Server | null = null;
@@ -35,7 +35,7 @@ export class PeerCollaborationServer {
                     server.close();
 
                     // Now create WebSocket server on this port
-                    this.wss = new WebSocket.Server({ port });
+                    this.wss = new WebSocketServer({ port });
 
                     this.wss.on('connection', (ws) => {
                         const peerId = this.generatePeerId();
@@ -173,7 +173,7 @@ export class PeerCollaborationServer {
 }
 
 export class PeerClient {
-    private ws: WebSocket.WebSocket | null = null;
+    private ws: WebSocket | null = null;
     private peerId: string = '';
     private sessionId: string = '';
     private messageHandlers: Map<string, (message: PeerMessage) => void> = new Map();
@@ -182,7 +182,7 @@ export class PeerClient {
         return new Promise((resolve, reject) => {
             try {
                 this.sessionId = sessionId;
-                this.ws = new WebSocket.WebSocket(url);
+                this.ws = new WebSocket(url);
 
                 this.ws.on('open', () => {
                     // Send join message

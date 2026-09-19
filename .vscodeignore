@@ -17,7 +17,14 @@ test/**
 # Build artifacts
 out/test/**
 out/**/*.map
+*.vsix
+*.visx
 
-# Documentation
+# Maintainer-only docs and scripts (not needed inside the installed extension)
 CHANGELOG.md
-CONTRIBUTING.md 
+CONTRIBUTING.md
+PUBLISHING.md
+archive/**
+build.bat
+build.sh
+sample.tex 

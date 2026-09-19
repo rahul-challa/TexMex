@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.0.8] - 2026-09-18
+### Added
+- **Bundled Tectonic LaTeX engine** - no local LaTeX distribution required
+- Automatic per-platform engine download on first compile (Windows/macOS/Linux, x64/arm64), verified against a pinned SHA256 checksum and cached in global storage
+- On-demand LaTeX package fetching via Tectonic (only the packages a document needs, cached after first use)
+- "TexMex" output channel with full compiler logs
+- `texmex.redownloadEngine` ("TexMex: Reinstall LaTeX Engine") command for recovering from an interrupted/corrupted download
+- `texmex.showOutputLog` ("TexMex: Show Compiler Log") command
+- `texmex.useSystemLatex` / `texmex.systemLatexPath` settings as an advanced opt-out for users who prefer their own LaTeX install
+
+### Removed
+- Online compilation fallback (`pdflatex.online`) - previously sent document content to a third-party service by default; compilation is now always local
+- `texmex.latexPath` and `texmex.enableOnlineFallback` settings (superseded by `texmex.useSystemLatex`/`texmex.systemLatexPath`)
+
+### Changed
+- Compilation temp/output files now live under the OS temp directory instead of a `.texmex-temp` folder inside the workspace
+- Build now bundles with esbuild instead of plain `tsc`, producing a smaller `.vsix`
+- Repository moved out of the project root into `archive/`: old version-pinned publishing guides and release scripts, superseded by `PUBLISHING.md`
+
+### Fixed
+- Marketplace page showing a broken logo image - `package.json`'s `repository.url` pointed at the wrong GitHub org/repo casing, which broke the Marketplace's resolution of relative image paths in the README
+- A `ws` import pattern that would have silently broken peer collaboration once bundled with esbuild (`WebSocket.Server`/`WebSocket.OPEN` resolved to `undefined` under esbuild's ESM resolution of the `ws` package)
+
 ## [0.0.7] - 2025-06-19
 ### Added
 - 🎯 **Hybrid LaTeX Compilation Mode** - Local + Online with automatic fallback

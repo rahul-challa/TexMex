@@ -3,7 +3,7 @@
   "displayName": "TexMex",
   "publisher": "RahulChalla",
   "description": "Live LaTeX preview and editing for VS Code",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -20,7 +20,6 @@
   ],
   "activationEvents": [
     "onLanguage:latex",
-    "onCommand:texmex.openPreview",
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
@@ -40,16 +39,21 @@
         "command": "texmex.joinPeerSession",
         "title": "TexMex: Join Peer Session",
         "category": "TexMex"
+      },
+      {
+        "command": "texmex.redownloadEngine",
+        "title": "TexMex: Reinstall LaTeX Engine",
+        "category": "TexMex"
+      },
+      {
+        "command": "texmex.showOutputLog",
+        "title": "TexMex: Show Compiler Log",
+        "category": "TexMex"
       }
     ],
     "configuration": {
       "title": "TexMex",
       "properties": {
-        "texmex.latexPath": {
-          "type": "string",
-          "default": "pdflatex",
-          "description": "Path to the LaTeX compiler executable"
-        },
         "texmex.updateDelay": {
           "type": "number",
           "default": 1000,
@@ -65,22 +69,30 @@
           "default": 3000,
           "description": "Port for the peer collaboration server"
         },
-        "texmex.enableOnlineFallback": {
+        "texmex.useSystemLatex": {
           "type": "boolean",
-          "default": true,
-          "description": "Enable online LaTeX compilation fallback if local LaTeX distro not found"
+          "default": false,
+          "description": "Advanced: use a LaTeX distribution already installed on your system instead of TexMex's bundled LaTeX engine"
+        },
+        "texmex.systemLatexPath": {
+          "type": "string",
+          "default": "pdflatex",
+          "description": "Path to your system LaTeX compiler executable. Only used when texmex.useSystemLatex is enabled"
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run clean && npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run clean && npm run build",
+    "compile": "npm run typecheck && npm run esbuild",
+    "typecheck": "tsc --noEmit -p ./",
+    "esbuild": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap",
+    "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
+    "watch": "npm run esbuild -- --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
-    "clean": "rimraf out .texmex-temp",
+    "clean": "rimraf out",
     "package": "npm run vscode:prepublish && vsce package",
     "install-vsce": "npm install -g @vscode/vsce"
   },
@@ -105,12 +117,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/RahulChalla/texmex.git"
+    "url": "https://github.com/rahul-challa/TexMex.git"
   },
   "bugs": {
-    "url": "https://github.com/RahulChalla/texmex/issues"
+    "url": "https://github.com/rahul-challa/TexMex/issues"
   },
-  "homepage": "https://github.com/RahulChalla/texmex#readme",
+  "homepage": "https://github.com/rahul-challa/TexMex#readme",
   "author": "Rahul Challa <challaviswanadhrahul@gmail.com>",
   "license": "MIT"
 }
